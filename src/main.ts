@@ -59,23 +59,28 @@ type PointOnCanvas = {x: number, y: number};
 
 class DrawingStroke extends Array<PointOnCanvas> implements UndoableCommand {
 
-    execute() {
+    display(context: CanvasRenderingContext2D): void {
         if (this.length == 1) { return; }
 
         let [first_point, ...rest_point] = this;
 
-        canvas_context.beginPath();
-        canvas_context.moveTo(first_point.x, first_point.y);
+        context.beginPath();
+        context.moveTo(first_point.x, first_point.y);
 
         // draw rest of point
         let last_point: PointOnCanvas = first_point
 
         for (const point of rest_point) {
-            canvas_context.lineTo(point.x, point.y);
+            context.lineTo(point.x, point.y);
             last_point = point;
         }
 
-        canvas_context.stroke();
+        context.stroke();
+
+    }
+
+    execute() {
+        this.display(canvas_context);
     }
 
     undo() {
