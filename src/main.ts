@@ -5,8 +5,9 @@ import "./style.css";
 
 
 // configs
-const APP_NAME = "Simple Painter"
-const CANVAS_DIMENSION = {x: 256, y: 256}
+const APP_NAME = "Simple Painter";
+const CANVAS_DIMENSION = {x: 256, y: 256};
+const DRAWING_CHANGE_EVENT = "drawing-changed";
 
 
 
@@ -37,33 +38,74 @@ app.append(canvas_element);
 
 const canvas_context = canvas_element.getContext('2d')!;
 
-// cursor actions
-const cursor = {active: false, x: 0, y: 0};
 
-// start drawing
+
+
+
+// drawing system
+function empty_canvas(
+        canvas: HTMLCanvasElement, context: CanvasRenderingContext2D): void {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+type PointOnCanvas = {x: number, y: number};
+type DrawingStroke = PointOnCanvas[];
+let strokes: DrawingStroke[] = [];
+
+
+// observer for the "drawing-changed" event
+canvas_element.addEventListener(DRAWING_CHANGE_EVENT, () => {
+    empty_canvas(canvas_element, canvas_context);
+
+    for (const stroke of strokes) {
+        if (stroke.length == 1) { continue; }
+        let [first_point, ...rest_point] = stroke;
+
+        canvas_context.beginPath();
+        canvas_context.moveTo(first_point.x, first_point.y);
+
+        // draw rest of point
+        let last_point: PointOnCanvas = first_point
+
+        for (const point of rest_point) {
+            canvas_context.lineTo(point.x, point.y);
+            last_point = point;
+        }
+
+        canvas_context.stroke();
+    }
+
+});
+
+
+// cursor & canvas
+let current_stroke_idx: number | null = null;
+
+// start new stroke
 canvas_element.addEventListener("mousedown", (event) => {
-    cursor.active = true;
-    cursor.x = event.offsetX;
-    cursor.y = event.offsetY;
+    if (current_stroke_idx === null) {
+        current_stroke_idx = strokes.length;
+        const current_stroke = [{x: event.offsetX, y: event.offsetY}];
+        strokes.push(current_stroke);
+    }
 });
 
 // during drawing
 canvas_element.addEventListener("mousemove", (event) => {
-    if (cursor.active) {
-        canvas_context.beginPath();
-        canvas_context.moveTo(cursor.x, cursor.y);
-        canvas_context.lineTo(event.offsetX, event.offsetY);
-        canvas_context.stroke();
-        // save for next stroke
-        cursor.x = event.offsetX;
-        cursor.y = event.offsetY;
+    if (current_stroke_idx !== null) {
+        strokes[current_stroke_idx].push({x: event.offsetX, y: event.offsetY});
+
+        canvas_element.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
     }
 });
 
 // finish drawing
 canvas_element.addEventListener("mouseup", (event) => {
-    cursor.active = false;
+    current_stroke_idx = null;
+
+    canvas_element.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
 });
+
 
 
 
@@ -74,7 +116,8 @@ button_element.type = 'button';
 button_element.textContent = 'clear';
 
 button_element.addEventListener('click', () => {
-    canvas_context.clearRect(0, 0, canvas_element.width, canvas_element.height);
+    strokes = [];
+    canvas_element.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
 });
 
 app.append(button_element);
