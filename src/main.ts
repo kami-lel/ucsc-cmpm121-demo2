@@ -10,9 +10,9 @@ const CANVAS_DIMENSION = {x: 256, y: 256};
 const CANVAS_UPDATE_EVENT = 'canvas-update';
 const TAB_SWITCH_EVENT = "tab-switch";
 
-const MARKER_TOOL_NAME = 'Marker';
-const STICKER_TOOL_NAME = 'Sticker';
-const EXPORT_TOOL_NAME = 'Exporter';
+const MARKER_TOOL_NAME = '🖍️Marker';
+const STICKER_TOOL_NAME = '🏷️Sticker';
+const EXPORT_TOOL_NAME = '📤Exporter';
 
 
 const EXPORT_SCALE_UP = 4;
@@ -199,7 +199,7 @@ input_div_element.append(universal_buttons_div_element);
 // clear button
 const button_clear: HTMLButtonElement = document.createElement('button');
 button_clear.type = 'button';
-button_clear.textContent = 'clear';
+button_clear.textContent = '🧹Clear';
 
 button_clear.addEventListener('click', () => {
     render_system.clear();
@@ -210,7 +210,7 @@ universal_buttons_div_element.append(button_clear);
 // undo button
 const button_undo: HTMLButtonElement = document.createElement('button');
 button_undo.type = 'button';
-button_undo.textContent = 'undo';
+button_undo.textContent = '↩️Undo';
 
 button_undo.addEventListener('click', () => {
     render_system.undo();
@@ -221,7 +221,7 @@ universal_buttons_div_element.append(button_undo);
 // redo button
 const button_redo: HTMLButtonElement = document.createElement('button');
 button_redo.type = 'button';
-button_redo.textContent = 'redo';
+button_redo.textContent = '↪️Redo';
 
 button_redo.addEventListener('click', () => {
     render_system.redo();
