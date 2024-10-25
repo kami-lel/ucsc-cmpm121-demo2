@@ -10,6 +10,11 @@ import { CommandSystem, UndoableCommand } from "./undo_system.ts";
 const APP_NAME = "Simple Painter";
 const CANVAS_DIMENSION = {x: 256, y: 256};
 const DRAWING_CHANGE_EVENT = "drawing-changed";
+const TAB_SWITCH_EVENT = "tab-switch";
+
+const THICKNESS_THICK = 5;
+const THICKNESS_THIN = 1;
+const _THICKNESS_DIVISOR = 10;
 
 
 
@@ -71,6 +76,7 @@ class DrawingStroke extends Array<PointOnCanvas> implements UndoableCommand {
         const [first_point, ...rest_point] = this;
 
         context.beginPath();
+        context.lineWidth = this.thickness;
         context.moveTo(first_point.x, first_point.y);
 
         // draw rest of point
@@ -82,7 +88,7 @@ class DrawingStroke extends Array<PointOnCanvas> implements UndoableCommand {
 
     }
 
-    execute() {
+    do() {
         this.display(canvas_context);
     }
 
@@ -97,18 +103,19 @@ let current_stroke: DrawingStroke | null = null;
 
 // observer for the "drawing-changed" event
 canvas_element.addEventListener(DRAWING_CHANGE_EVENT, () => {
-    current_stroke?.execute();
+    current_stroke?.do();
 });
 
 
 
 
 
+let stroke_thickness = THICKNESS_THICK;
 
 // start new stroke
 canvas_element.addEventListener("mousedown", (event) => {
     if (current_stroke === null) {
-        current_stroke = new DrawingStroke();
+        current_stroke = new DrawingStroke(stroke_thickness);
         current_stroke.push({x: event.offsetX, y: event.offsetY});
 
         canvas_element.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
@@ -139,9 +146,16 @@ canvas_element.addEventListener("mouseleave", finish_drawing_event_listener);
 
 
 
-// buttons
-// create a div container
-const button_div_element: HTMLDivElement = document.createElement('div');
+
+const input_div_element: HTMLDivElement = document.createElement('div');
+input_div_element.className = 'inputs';
+app.append(input_div_element);
+
+
+
+// universal buttons, viz. clear, undo, redo
+const universal_buttons_div_element: HTMLDivElement = document.createElement('div');
+input_div_element.append(universal_buttons_div_element);
 
 // clear button
 const button_clear: HTMLButtonElement = document.createElement('button');
@@ -152,7 +166,7 @@ button_clear.addEventListener('click', () => {
     commands.initialize();
     canvas_element.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
 });
-button_div_element.append(button_clear);
+universal_buttons_div_element.append(button_clear);
 
 // undo button
 const button_undo: HTMLButtonElement = document.createElement('button');
@@ -162,7 +176,7 @@ button_undo.textContent = 'undo';
 button_undo.addEventListener('click', () => {
     commands.undo();
 });
-button_div_element.append(button_undo);
+universal_buttons_div_element.append(button_undo);
 
 // redo button
 const button_redo: HTMLButtonElement = document.createElement('button');
@@ -172,7 +186,114 @@ button_redo.textContent = 'redo';
 button_redo.addEventListener('click', () => {
     commands.redo();
 });
-button_div_element.append(button_redo);
+universal_buttons_div_element.append(button_redo);
 
-// append the container to the app
-app.append(button_div_element);
+
+
+
+// tabs
+const tab_selection_buttons_div_element: HTMLDivElement =
+        document.createElement('div');
+input_div_element.append(tab_selection_buttons_div_element);
+
+
+let selected_tool: string;
+
+class SelectionTab {
+    public name: string;
+    public button: HTMLButtonElement;
+    public div: HTMLDivElement;
+
+    constructor(name: string, set_up_div: (div: HTMLDivElement) => void) {
+        this.name = name;
+
+        this.button = document.createElement('button');
+        this.button.type = 'button';
+        this.button.textContent = this.name;
+        this.button.className = 'tab-selection-button';
+        this.button.addEventListener('click', () => {
+           selected_tool = this.name;
+           canvas_element.dispatchEvent(new Event(TAB_SWITCH_EVENT));
+        });
+        tab_selection_buttons_div_element.append(this.button);
+
+
+
+        this.div = document.createElement('div');
+        this.div.className = 'tab-div';
+        this.div.style.display = 'none';
+        set_up_div(this.div);
+        input_div_element.append(this.div);
+    }
+
+    select(): void {
+        this.button.classList.add('active');
+        this.button.disabled = true;
+
+        this.div.style.display = '';
+    }
+
+    de_select(): void {
+        this.button.classList.remove('active');
+        this.button.disabled = false;
+
+        this.div.style.display = 'none';
+    }
+}
+
+
+
+const tabs: Array<SelectionTab> = [];
+
+tabs.push(new SelectionTab("Marker", (div) => {
+   const slider = document.createElement('input');
+   slider.type = 'range';
+   slider.value = THICKNESS_THICK * _THICKNESS_DIVISOR;
+    // add event listener for slide changing
+    slider.addEventListener('input', (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        stroke_thickness = target.value / _THICKNESS_DIVISOR;
+        console.log(stroke_thickness);
+    });
+
+   const thick_button = document.createElement('button');
+   div.appendChild(thick_button);
+   thick_button.textContent = 'Thick';
+   thick_button.addEventListener('click', () => {
+       stroke_thickness = THICKNESS_THICK;
+       slider.value = THICKNESS_THICK * _THICKNESS_DIVISOR;
+
+   })
+
+
+   const thin_button = document.createElement('button');
+   div.appendChild(thin_button);
+   thin_button.textContent = 'Thin';
+   thin_button.addEventListener('click', () => {
+       stroke_thickness = THICKNESS_THIN;
+       slider.value = THICKNESS_THIN * _THICKNESS_DIVISOR;
+   })
+
+   div.appendChild(slider);
+
+}));
+
+tabs.push(new SelectionTab("Sticker", (div) => {
+    div.append('TODO sticker');
+
+}));
+
+
+canvas_element.addEventListener(TAB_SWITCH_EVENT, () => {
+    for (const tab of tabs) {
+        if (tab.name == selected_tool) {
+            tab.select();
+        } else {
+            tab.de_select();
+        }
+
+    }
+});
+
+tabs[0].select();
+

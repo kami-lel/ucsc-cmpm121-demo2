@@ -1,6 +1,6 @@
 
 export interface UndoableCommand {
-    execute(): void;  // do & redo
+    do(): void;  // do & redo
     undo(): boolean;
 }
 
@@ -36,7 +36,7 @@ export class CommandSystem extends Array<UndoableCommand> {
             if (!succ) {  // this command is not undoable
                 for (const fx of this.initializers) { fx(); }
                 for (const cmd of this) {
-                    cmd.execute();
+                    cmd.do();
                 }
             }
 
@@ -54,7 +54,7 @@ export class CommandSystem extends Array<UndoableCommand> {
             if (this.undo_cache.length === 0) { return; }
 
             let redo_cmd = this.undo_cache.pop()!;
-            redo_cmd.execute();
+            redo_cmd.do();
             this.push(redo_cmd);
 
         } else {
@@ -69,7 +69,7 @@ export class CommandSystem extends Array<UndoableCommand> {
 
         // perform newly added commands
         for (const cmd of items) {
-            cmd.execute();
+            cmd.do();
         }
 
         return super.push(...items);

@@ -5,7 +5,9 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #a9a9a9;
+
+
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -28,6 +30,11 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+
+  background-image: url('https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
 }
 
 h1 {
@@ -75,6 +82,7 @@ button {
 }
 button:hover {
   border-color: #646cff;
+  background-color: #2e2e2e;
 }
 button:focus,
 button:focus-visible {
@@ -98,7 +106,33 @@ button:focus-visible {
 
 
 canvas {
+    background-color: white;
     border: 1px solid black;
     border-radius: 8px; /* friendly rounded corners */
     box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3); /* nice drop shadow effect */
+}
+
+
+.inputs {
+    background-color: gray;
+    border: 2px solid black;
+    border-radius: 10px; /* This gives the border rounded corners */
+    padding: 10px; /* Optional: Adds some space inside the div */
+}
+
+.inputs > * {
+    margin-bottom: 15px; /* increases spacing between elements */
+}
+
+
+.tab-selection-button.active {
+    background-color: orange;
+    color: white;
+}
+
+
+.tab-div {
+  border: 2px solid black;
+  border-radius: 10px; /* This gives the border rounded corners */
+  padding: 15px;
 }
