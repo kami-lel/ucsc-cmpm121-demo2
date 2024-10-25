@@ -17,6 +17,11 @@ const THICKNESS_THICK = 5;
 const THICKNESS_THIN = 1;
 const _THICKNESS_DIVISOR = 10;
 
+const STICKER_1 = '🚀'; // Rocket
+const STICKER_2 = '🌈'; // Rainbow
+const STICKER_3 = '🎨'; // Palette
+
+
 
 
 
@@ -71,7 +76,7 @@ type PointOnCanvas = {x: number, y: number};
 
 // drawing system
 interface UndoableDraw {
-    do(): void;
+    do(context: CanvasRenderingContext2D): void;
 }
 
 
@@ -108,7 +113,7 @@ class RenderSystem extends Array<UndoableDraw> {
             if (this.undo_cache.length === 0) { return; }
 
             let redo_cmd = this.undo_cache.pop()!;
-            redo_cmd.do();
+            redo_cmd.do(this.context);
             this.push(redo_cmd);
 
         } else {
@@ -140,7 +145,7 @@ class RenderSystem extends Array<UndoableDraw> {
 
         // render draw queue
         for (const draw of this) {
-            draw.do();
+            draw.do(this.context);
         }
     }
 
@@ -192,7 +197,7 @@ button_clear.textContent = 'clear';
 
 button_clear.addEventListener('click', () => {
     render_system.clear();
-    canvas.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
+    canvas.dispatchEvent(new Event(CANVAS_UPDATE_EVENT));
 });
 universal_buttons_div_element.append(button_clear);
 
@@ -203,7 +208,7 @@ button_undo.textContent = 'undo';
 
 button_undo.addEventListener('click', () => {
     render_system.undo();
-    canvas.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
+    canvas.dispatchEvent(new Event(CANVAS_UPDATE_EVENT));
 });
 universal_buttons_div_element.append(button_undo);
 
@@ -214,7 +219,7 @@ button_redo.textContent = 'redo';
 
 button_redo.addEventListener('click', () => {
     render_system.redo();
-    canvas.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
+    canvas.dispatchEvent(new Event(CANVAS_UPDATE_EVENT));
 });
 universal_buttons_div_element.append(button_redo);
 
@@ -333,7 +338,7 @@ class MarkerStroke extends Array<PointOnCanvas> implements UndoableDraw{
         this.thickness = thickness;
     }
 
-    display(context: CanvasRenderingContext2D): void {
+    do(context: CanvasRenderingContext2D): void {
         if (this.length == 1) { return; }
 
         const [first_point, ...rest_point] = this;
@@ -348,11 +353,6 @@ class MarkerStroke extends Array<PointOnCanvas> implements UndoableDraw{
         }
 
         context.stroke();
-
-    }
-
-    do() {
-        this.display(render_system.context);
     }
 }
 
@@ -429,11 +429,68 @@ tools.select(MARKER_TOOL_NAME);
 
 
 // Sticker tool
-class StickerTool extends Tool {
-    
+function _draw_at(context: CanvasRenderingContext2D, point: PointOnCanvas,
+        content: string) {
+    // set font size for rendering
+    context.font = '24px serif';
+
+    // rendering position
+    const x = point.x - 15;
+    const y = point.y + 15;
+
+    // draw the emoji on the context at specified coordinates
+    context.fillText(content, x, y);
 }
 
-tools.push(new StickerTool(STICKER_TOOL_NAME));
+class StickerStamp implements UndoableDraw {
+    sticker: string;
+    position: PointOnCanvas
+
+    constructor(sticker: string, position: PointOnCanvas) {
+        this.sticker = sticker
+        this.position = position;
+    }
+
+    do(context: CanvasRenderingContext2D): void {
+        _draw_at(context, this.position, this.sticker);
+    }
+}
+
+class StickerTool extends Tool {
+    content: string = STICKER_1;
+
+    protected init_div(): void {
+        const button1 = document.createElement('button');
+        button1.textContent = STICKER_1;
+        button1.addEventListener('click', () => {
+            this.content = STICKER_1;
+        });
+
+        const button2 = document.createElement('button');
+        button2.textContent = STICKER_2;
+        button2.addEventListener('click', () => {
+            this.content = STICKER_2;
+        });
+
+        const button3 = document.createElement('button');
+        button3.textContent = STICKER_3;
+        button3.addEventListener('click', () => {
+            this.content = STICKER_3;
+        });
+
+        // Append buttons to div_element
+        this.div_element.appendChild(button1);
+        this.div_element.appendChild(button2);
+        this.div_element.appendChild(button3);
+    }
+
+    preview_draw(context: CanvasRenderingContext2D): void {
+        _draw_at(context, mouse_current!, this.content);
+    }
+}
+
+const sticker_tool = new StickerTool(STICKER_TOOL_NAME);
+tools.push(sticker_tool);
 
 
 
@@ -452,7 +509,7 @@ let mouse_current: PointOnCanvas | null = null;
 canvas.addEventListener(CANVAS_UPDATE_EVENT, () => {
     render_system.render();
     if (tools.current_tool_name == MARKER_TOOL_NAME) {
-        marker_tool.current_stroke?.do();
+        marker_tool.current_stroke?.do(render_system.context);
     }
 });
 
@@ -465,8 +522,13 @@ canvas.addEventListener("mousedown", (event) => {
             marker_tool.current_stroke =
                     new MarkerStroke(marker_tool.thickness);
             marker_tool.current_stroke.push({x: event.offsetX, y: event.offsetY});
-            break;
         }
+        break;
+
+    case STICKER_TOOL_NAME:
+        render_system.add(new StickerStamp(sticker_tool.content,
+                mouse_current!));
+        break;
     }
 
     canvas.dispatchEvent(new Event(CANVAS_UPDATE_EVENT));
