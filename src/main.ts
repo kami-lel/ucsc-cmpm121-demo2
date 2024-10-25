@@ -12,6 +12,11 @@ const TAB_SWITCH_EVENT = "tab-switch";
 
 const MARKER_TOOL_NAME = 'Marker';
 const STICKER_TOOL_NAME = 'Sticker';
+const EXPORT_TOOL_NAME = 'Exporter';
+
+
+const EXPORT_SCALE_UP = 4;
+const EXPORT_DOWNLOAD_NAME = 'hd_export.png'
 
 const THICKNESS_THICK = 5;
 const THICKNESS_THIN = 1;
@@ -96,6 +101,7 @@ class RenderSystem extends Array<UndoableDraw> {
     }
 
     undo(times?: number): void {
+
         if (times === undefined) {
             if (this.length == 0) { return; }
 
@@ -109,13 +115,15 @@ class RenderSystem extends Array<UndoableDraw> {
         }
     }
 
-    redo(times?: number): void {
+    redo(times?: number, outside_context?: CanvasRenderingContext2D): void {
+        const context = outside_context ? outside_context : this.context;
+
         if (times === undefined) {
             // exit if no further actions to redo
             if (this.undo_cache.length === 0) { return; }
 
             let redo_cmd = this.undo_cache.pop()!;
-            redo_cmd.do(this.context);
+            redo_cmd.do(context);
             this.push(redo_cmd);
 
         } else {
@@ -135,19 +143,15 @@ class RenderSystem extends Array<UndoableDraw> {
         super.push(new_draw);
     }
 
-    empty_canvas() {
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-
-    render() {
-        this.empty_canvas();
+    render(outside_context?: CanvasRenderingContext2D) {
+        const context = outside_context ? outside_context : this.context;
 
         // render tool preview
-        tools.current().preview_draw(this.context);
+        tools.current().preview_draw(context);
 
         // render draw queue
         for (const draw of this) {
-            draw.do(this.context);
+            draw.do(context);
         }
     }
 
@@ -510,6 +514,48 @@ tools.push(sticker_tool);
 
 
 
+// Exporter
+class ExportTool extends Tool {
+
+    protected init_div(): void {
+        const export_button = document.createElement('button');
+        export_button.textContent ='Export';
+        export_button.addEventListener('click', () => {
+            this.export_hd();
+        });
+
+        // Append buttons to div_element
+        this.div_element.appendChild(export_button);
+    }
+
+    export_hd() {
+        const temp_canvas = document.createElement('canvas');
+        temp_canvas.width = canvas.width * EXPORT_SCALE_UP;
+        temp_canvas.height = canvas.height * EXPORT_SCALE_UP;
+
+        const temp_context =
+                temp_canvas.getContext('2d') as CanvasRenderingContext2D;
+        temp_context.scale(EXPORT_SCALE_UP, EXPORT_SCALE_UP);
+        render_system.render(temp_context);
+
+        // trigger download
+        const anchor = document.createElement("a");
+        anchor.href = temp_canvas.toDataURL("image/png");
+        anchor.download = EXPORT_DOWNLOAD_NAME;
+        anchor.click();
+    }
+
+}
+const export_tool = new ExportTool(EXPORT_TOOL_NAME);
+tools.push(export_tool);
+
+
+
+
+
+
+
+
 
 
 // input from canvas
@@ -517,7 +563,10 @@ let mouse_current: PointOnCanvas | null = null;
 
 
 canvas.addEventListener(CANVAS_UPDATE_EVENT, () => {
+    render_system.context.clearRect(
+            0, 0, render_system.canvas.width, render_system.canvas.height);
     render_system.render();
+
     if (tools.current_tool_name == MARKER_TOOL_NAME) {
         marker_tool.current_stroke?.do(render_system.context);
     }
