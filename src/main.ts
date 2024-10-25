@@ -20,6 +20,8 @@ const _THICKNESS_DIVISOR = 10;
 const STICKER_1 = '🚀'; // Rocket
 const STICKER_2 = '🌈'; // Rainbow
 const STICKER_3 = '🎨'; // Palette
+const STICKER_CUSTOM = '😊'; // Smiley face emoji
+
 
 
 
@@ -478,10 +480,18 @@ class StickerTool extends Tool {
             this.content = STICKER_3;
         });
 
+        const custom_button = document.createElement('button');
+        custom_button.textContent ='custom';
+        custom_button.addEventListener('click', () => {
+            const opt = prompt("Customize Sticker", STICKER_CUSTOM);
+            this.content = opt!;
+        });
+
         // Append buttons to div_element
         this.div_element.appendChild(button1);
         this.div_element.appendChild(button2);
         this.div_element.appendChild(button3);
+        this.div_element.appendChild(custom_button);
     }
 
     preview_draw(context: CanvasRenderingContext2D): void {
