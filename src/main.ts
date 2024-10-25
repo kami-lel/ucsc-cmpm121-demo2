@@ -7,9 +7,11 @@ import "./style.css";
 // configs
 const APP_NAME = "Simple Painter";
 const CANVAS_DIMENSION = {x: 256, y: 256};
-const DRAWING_CHANGE_EVENT = "drawing-changed";
+const CANVAS_UPDATE_EVENT = 'canvas-update';
 const TAB_SWITCH_EVENT = "tab-switch";
-const TOOL_MOVED_EVENT = "tool-moved";
+
+const MARKER_TOOL_NAME = 'Marker';
+const STICKER_TOOL_NAME = 'Sticker';
 
 const THICKNESS_THICK = 5;
 const THICKNESS_THIN = 1;
@@ -54,21 +56,7 @@ app.append(canvas);
 
 
 
-// tool preview
-interface ToolPreview {
-    draw(context: CanvasRenderingContext2D): void;
-}
-
-let mouse_current: PointOnCanvas;
-const tool_preview = {draw: (context) => {
-    context.beginPath();
-    // HACK
-    context.arc(mouse_current.x, mouse_current.y, render_system.marker_stroke_thickness, 0, Math.PI*2);
-
-    context.fillStype = 'black';
-    context.fill();
-    context.closePath();
-}}
+type PointOnCanvas = {x: number, y: number};
 
 
 
@@ -148,7 +136,7 @@ class RenderSystem extends Array<UndoableDraw> {
         this.empty_canvas();
 
         // render tool preview
-        tool_preview.draw(this.context);
+        tools.current().preview_draw(this.context);
 
         // render draw queue
         for (const draw of this) {
@@ -172,87 +160,6 @@ const render_system = new RenderSystem(canvas);
 
 
 
-
-type PointOnCanvas = {x: number, y: number};
-// Marker
-class MarkerStroke extends Array<PointOnCanvas> implements UndoableDraw{
-    private thickness: number;
-
-    constructor(thickness: number) {
-        super();
-        this.thickness = thickness;
-    }
-
-    display(context: CanvasRenderingContext2D): void {
-        if (this.length == 1) { return; }
-
-        const [first_point, ...rest_point] = this;
-
-        context.beginPath();
-        context.lineWidth = this.thickness;
-        context.moveTo(first_point.x, first_point.y);
-
-        // draw rest of point
-        for (const point of rest_point) {
-            context.lineTo(point.x, point.y);
-        }
-
-        context.stroke();
-
-    }
-
-    do() {
-        this.display(render_system.context);
-    }
-}
-
-let current_stroke: MarkerStroke | null = null;
-
-
-canvas.addEventListener(DRAWING_CHANGE_EVENT, () => {
-    render_system.render();
-    current_stroke?.do();
-});
-
-canvas.addEventListener(TOOL_MOVED_EVENT, () => {
-    render_system.render();
-    current_stroke?.do();
-});
-
-
-
-
-
-// start new stroke
-canvas.addEventListener("mousedown", (event) => {
-    if (current_stroke === null) {
-        current_stroke = new MarkerStroke(render_system.marker_stroke_thickness);
-        current_stroke.push({x: event.offsetX, y: event.offsetY});
-
-        canvas.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
-    }
-});
-
-// during drawing
-canvas.addEventListener("mousemove", (event) => {
-    mouse_current = {x: event.offsetX, y: event.offsetY};  // HACK
-    if (current_stroke !== null) {
-        current_stroke.push(mouse_current);
-    }
-    canvas.dispatchEvent(new Event(TOOL_MOVED_EVENT));
-});
-
-// finish drawing
-function finish_drawing_event_listener(_event: MouseEvent) {
-    if (current_stroke !== null) {
-        render_system.add(current_stroke!);
-        current_stroke = null;
-        canvas.dispatchEvent(new Event(DRAWING_CHANGE_EVENT));
-    }
-
-}
-canvas.addEventListener("mouseup", finish_drawing_event_listener);
-canvas.addEventListener("mouseleave", finish_drawing_event_listener);
 
 
 
@@ -320,103 +227,275 @@ const tab_selection_buttons_div_element: HTMLDivElement =
 input_div_element.append(tab_selection_buttons_div_element);
 
 
-let selected_tool: string;
 
-class SelectionTab {
-    public name: string;
-    public button: HTMLButtonElement;
-    public div: HTMLDivElement;
 
-    constructor(name: string, set_up_div: (div: HTMLDivElement) => void) {
+
+
+
+
+
+
+
+
+
+// tool system
+class Tool {
+    name: string;
+    button_element: HTMLButtonElement;
+    div_element: HTMLDivElement;
+
+    constructor(name: string) {
         this.name = name;
 
-        this.button = document.createElement('button');
-        this.button.type = 'button';
-        this.button.textContent = this.name;
-        this.button.className = 'tab-selection-button';
-        this.button.addEventListener('click', () => {
-           selected_tool = this.name;
+        this.button_element = document.createElement('button');
+        this.button_element.type = 'button';
+        this.button_element.textContent = this.name;
+        this.button_element.className = 'tab-selection-button';
+        this.button_element.addEventListener('click', () => {
+           tools.select(this.name);
            canvas.dispatchEvent(new Event(TAB_SWITCH_EVENT));
         });
-        tab_selection_buttons_div_element.append(this.button);
+        tab_selection_buttons_div_element.append(this.button_element);
 
-
-
-        this.div = document.createElement('div');
-        this.div.className = 'tab-div';
-        this.div.style.display = 'none';
-        set_up_div(this.div);
-        input_div_element.append(this.div);
+        this.div_element = document.createElement('div');
+        this.div_element.className = 'tab-div';
+        this.div_element.style.display = 'none';
+        this.init_div();
+        input_div_element.append(this.div_element);
     }
 
     select(): void {
-        this.button.classList.add('active');
-        this.button.disabled = true;
+        this.button_element.classList.add('active');
+        this.button_element.disabled = true;
 
-        this.div.style.display = '';
+        this.div_element.style.display = '';
     }
 
     de_select(): void {
-        this.button.classList.remove('active');
-        this.button.disabled = false;
+        this.button_element.classList.remove('active');
+        this.button_element.disabled = false;
 
-        this.div.style.display = 'none';
+        this.div_element.style.display = 'none';
+    }
+
+    preview_draw(context: CanvasRenderingContext2D): void {}
+
+    protected init_div():void {}
+}
+
+
+
+class ToolSystem extends Array<Tool> {
+
+    public current_tool_name: string;
+
+    select(name: string) {
+        this.current_tool_name = name;
+        for (const tool of this) {
+            if (tool.name == name) {
+                tool.select();
+            } else {
+                tool.de_select();
+            }
+        }
+    }
+
+    current() {
+        for (const tool of this) {
+            if (tool.name == this.current_tool_name) {
+                return tool;
+            }
+        }
+        return this[0];
+    }
+
+}
+
+const tools = new ToolSystem();
+
+
+
+
+
+
+
+
+
+
+
+
+// Marker tool
+class MarkerStroke extends Array<PointOnCanvas> implements UndoableDraw{
+    private thickness: number;
+
+    constructor(thickness: number) {
+        super();
+        this.thickness = thickness;
+    }
+
+    display(context: CanvasRenderingContext2D): void {
+        if (this.length == 1) { return; }
+
+        const [first_point, ...rest_point] = this;
+
+        context.beginPath();
+        context.lineWidth = this.thickness;
+        context.moveTo(first_point.x, first_point.y);
+
+        // draw rest of point
+        for (const point of rest_point) {
+            context.lineTo(point.x, point.y);
+        }
+
+        context.stroke();
+
+    }
+
+    do() {
+        this.display(render_system.context);
     }
 }
 
 
 
-const tabs: Array<SelectionTab> = [];
+class MarkerTool extends Tool {
+    current_stroke: MarkerStroke | null;
+    thickness: number;
 
-tabs.push(new SelectionTab("Marker", (div) => {
-   const slider = document.createElement('input');
-   slider.type = 'range';
-   slider.value = THICKNESS_THICK * _THICKNESS_DIVISOR;
-    // add event listener for slide changing
-    slider.addEventListener('input', (event: Event) => {
-        const target = event.target as HTMLInputElement;
-        render_system.marker_stroke_thickness =
-            target.value / _THICKNESS_DIVISOR;
-    });
+    constructor(name: string) {
+        super(name);
+        this.thickness = THICKNESS_THICK
+        this.current_stroke = null;
+    }
 
-   const thick_button = document.createElement('button');
-   div.appendChild(thick_button);
-   thick_button.textContent = 'Thick';
-   thick_button.addEventListener('click', () => {
-       render_system.marker_stroke_thickness = THICKNESS_THICK;
-       slider.value = THICKNESS_THICK * _THICKNESS_DIVISOR;
+    preview_draw(context: CanvasRenderingContext2D): void {
+        if (mouse_current !== null) {
+            context.beginPath();
+            context.arc(mouse_current.x, mouse_current.y,
+                    this.thickness, 0, Math.PI*2);
 
-   })
-
-
-   const thin_button = document.createElement('button');
-   div.appendChild(thin_button);
-   thin_button.textContent = 'Thin';
-   thin_button.addEventListener('click', () => {
-       render_system.marker_stroke_thickness = THICKNESS_THIN;
-       slider.value = THICKNESS_THIN * _THICKNESS_DIVISOR;
-   })
-
-   div.appendChild(slider);
-
-}));
-
-tabs.push(new SelectionTab("Sticker", (div) => {
-    div.append('TODO sticker');  // TODO
-
-}));
-
-
-canvas.addEventListener(TAB_SWITCH_EVENT, () => {
-    for (const tab of tabs) {
-        if (tab.name == selected_tool) {
-            tab.select();
-        } else {
-            tab.de_select();
+            context.fillStyle = 'black';
+            context.fill();
+            context.closePath();
         }
+    }
 
+    protected init_div(): void {
+       const slider = document.createElement('input');
+       slider.type = 'range';
+       slider.value = (THICKNESS_THICK * _THICKNESS_DIVISOR).toString();
+       // add event listener for slide changing
+       slider.addEventListener('input', (event: Event) => {
+           const target = event.target as HTMLInputElement;
+           this.thickness = target.value / _THICKNESS_DIVISOR;
+       });
+
+       const thick_button = document.createElement('button');
+       this.div_element.appendChild(thick_button);
+       thick_button.textContent = 'Thick';
+       thick_button.addEventListener('click', () => {
+           this.thickness = THICKNESS_THICK;
+           slider.value = THICKNESS_THICK * _THICKNESS_DIVISOR;
+
+       })
+
+
+       const thin_button = document.createElement('button');
+       this.div_element.appendChild(thin_button);
+       thin_button.textContent = 'Thin';
+       thin_button.addEventListener('click', () => {
+           this.thickness = THICKNESS_THIN;
+           slider.value = THICKNESS_THIN * _THICKNESS_DIVISOR;
+       })
+
+       this.div_element.appendChild(slider);
+    }
+}
+
+
+const marker_tool = new MarkerTool(MARKER_TOOL_NAME);
+tools.push(marker_tool);
+tools.select(MARKER_TOOL_NAME);
+
+
+
+
+
+
+
+
+
+
+
+
+// Sticker tool
+class StickerTool extends Tool {
+    
+}
+
+tools.push(new StickerTool(STICKER_TOOL_NAME));
+
+
+
+
+
+
+
+
+
+
+
+// input from canvas
+let mouse_current: PointOnCanvas | null = null;
+
+
+canvas.addEventListener(CANVAS_UPDATE_EVENT, () => {
+    render_system.render();
+    if (tools.current_tool_name == MARKER_TOOL_NAME) {
+        marker_tool.current_stroke?.do();
     }
 });
 
-tabs[0].select();
 
+// start new stroke
+canvas.addEventListener("mousedown", (event) => {
+    switch (tools.current_tool_name)  {
+    case MARKER_TOOL_NAME:
+        if (marker_tool.current_stroke === null) {
+            marker_tool.current_stroke =
+                    new MarkerStroke(marker_tool.thickness);
+            marker_tool.current_stroke.push({x: event.offsetX, y: event.offsetY});
+            break;
+        }
+    }
+
+    canvas.dispatchEvent(new Event(CANVAS_UPDATE_EVENT));
+});
+
+// during drawing
+canvas.addEventListener("mousemove", (event) => {
+    mouse_current = {x: event.offsetX, y: event.offsetY};
+    switch (tools.current_tool_name)  {
+    case MARKER_TOOL_NAME:
+        if (marker_tool.current_stroke !== null) {
+            marker_tool.current_stroke.push(mouse_current);
+        }
+    }
+
+    canvas.dispatchEvent(new Event(CANVAS_UPDATE_EVENT));
+});
+
+// finish drawing
+function finish_drawing_event_listener(_event: MouseEvent) {
+    switch (tools.current_tool_name)  {
+    case MARKER_TOOL_NAME:
+        if (marker_tool.current_stroke !== null) {
+            render_system.add(marker_tool.current_stroke!);
+            marker_tool.current_stroke = null;
+            canvas.dispatchEvent(new Event(CANVAS_UPDATE_EVENT));
+        }
+
+    }
+}
+canvas.addEventListener("mouseup", finish_drawing_event_listener);
+canvas.addEventListener("mouseleave", finish_drawing_event_listener);
