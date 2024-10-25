@@ -58,21 +58,24 @@ commands.initializers.push(() => {
 type PointOnCanvas = {x: number, y: number};
 
 class DrawingStroke extends Array<PointOnCanvas> implements UndoableCommand {
+    private thickness: number;
+
+    constructor(thickness: number) {
+        super();
+        this.thickness = thickness;
+    }
 
     display(context: CanvasRenderingContext2D): void {
         if (this.length == 1) { return; }
 
-        let [first_point, ...rest_point] = this;
+        const [first_point, ...rest_point] = this;
 
         context.beginPath();
         context.moveTo(first_point.x, first_point.y);
 
         // draw rest of point
-        let last_point: PointOnCanvas = first_point
-
         for (const point of rest_point) {
             context.lineTo(point.x, point.y);
-            last_point = point;
         }
 
         context.stroke();
@@ -121,7 +124,7 @@ canvas_element.addEventListener("mousemove", (event) => {
 });
 
 // finish drawing
-function finish_drawing_event_listener(event) {
+function finish_drawing_event_listener(_event: MouseEvent) {
     if (current_stroke !== null) {
         commands.push(current_stroke!);
         current_stroke = null;
