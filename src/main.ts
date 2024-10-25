@@ -22,9 +22,8 @@ const THICKNESS_THICK = 5;
 const THICKNESS_THIN = 1;
 const _THICKNESS_DIVISOR = 10;
 
-const STICKER_1 = '🚀'; // Rocket
-const STICKER_2 = '🌈'; // Rainbow
-const STICKER_3 = '🎨'; // Palette
+const STICKERS = ['🚀', '🌈', '🎨', '🤖', '🦄', '🎉', '🔥', '💡', '🌟', '🍕'];
+
 const STICKER_CUSTOM = '😊'; // Smiley face emoji
 
 
@@ -69,6 +68,7 @@ app.append(canvas);
 
 
 type PointOnCanvas = {x: number, y: number};
+type RGBColor = {r: number, g: number, b: number};
 
 
 
@@ -336,16 +336,23 @@ const tools = new ToolSystem();
 
 
 // Marker tool
-class MarkerStroke extends Array<PointOnCanvas> implements UndoableDraw{
-    private thickness: number;
 
-    constructor(thickness: number) {
+
+class MarkerStroke extends Array<PointOnCanvas> implements UndoableDraw{
+    thickness: number;
+    color: RGBColor;
+
+    constructor(thickness: number, color: RGBColor) {
         super();
         this.thickness = thickness;
+        this.color = color;
     }
 
     do(context: CanvasRenderingContext2D): void {
         if (this.length == 1) { return; }
+
+        const rgb = this.color
+        context.strokeStyle= `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
 
         const [first_point, ...rest_point] = this;
 
@@ -367,11 +374,13 @@ class MarkerStroke extends Array<PointOnCanvas> implements UndoableDraw{
 class MarkerTool extends Tool {
     current_stroke: MarkerStroke | null;
     thickness: number;
+    color: RGBColor;
 
     constructor(name: string) {
         super(name);
         this.thickness = THICKNESS_THICK
         this.current_stroke = null;
+        this.color = {r:0, g: 0, b: 0};
     }
 
     preview_draw(context: CanvasRenderingContext2D): void {
@@ -380,41 +389,93 @@ class MarkerTool extends Tool {
             context.arc(mouse_current.x, mouse_current.y,
                     this.thickness, 0, Math.PI*2);
 
-            context.fillStyle = 'black';
+            const rgb = this.color
+            context.fillStyle = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
             context.fill();
             context.closePath();
         }
     }
 
     protected init_div(): void {
-       const slider = document.createElement('input');
-       slider.type = 'range';
-       slider.value = (THICKNESS_THICK * _THICKNESS_DIVISOR).toString();
-       // add event listener for slide changing
-       slider.addEventListener('input', (event: Event) => {
-           const target = event.target as HTMLInputElement;
-           this.thickness = target.value / _THICKNESS_DIVISOR;
-       });
+        const thickness_div = document.createElement('div') as HTMLDivElement;
+        this.div_element.appendChild(thickness_div);
 
-       const thick_button = document.createElement('button');
-       this.div_element.appendChild(thick_button);
-       thick_button.textContent = 'Thick';
-       thick_button.addEventListener('click', () => {
-           this.thickness = THICKNESS_THICK;
-           slider.value = THICKNESS_THICK * _THICKNESS_DIVISOR;
+        const rotate_text = document.createTextNode('Thickness:');
+        thickness_div.appendChild(rotate_text);
 
-       })
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.value = (THICKNESS_THICK * _THICKNESS_DIVISOR).toString();
+        slider.addEventListener('input', (event: Event) => {
+            const target = event.target as HTMLInputElement;
+            this.thickness = Number(target.value) / _THICKNESS_DIVISOR;
+        });
+
+        const thick_button = document.createElement('button');
+        thickness_div.appendChild(thick_button);
+        thick_button.textContent = 'Thick';
+        thick_button.addEventListener('click', () => {
+            this.thickness = THICKNESS_THICK;
+            slider.value = (THICKNESS_THICK * _THICKNESS_DIVISOR).toString();
+
+        })
 
 
-       const thin_button = document.createElement('button');
-       this.div_element.appendChild(thin_button);
-       thin_button.textContent = 'Thin';
-       thin_button.addEventListener('click', () => {
-           this.thickness = THICKNESS_THIN;
-           slider.value = THICKNESS_THIN * _THICKNESS_DIVISOR;
-       })
+        const thin_button = document.createElement('button');
+        thickness_div.appendChild(thin_button);
+        thin_button.textContent = 'Thin';
+        thin_button.addEventListener('click', () => {
+            this.thickness = THICKNESS_THIN;
+            slider.value = (THICKNESS_THIN * _THICKNESS_DIVISOR).toString();
+        })
 
-       this.div_element.appendChild(slider);
+        thickness_div.appendChild(slider);
+
+
+
+        const color_div = document.createElement('div') as HTMLDivElement;
+        this.div_element.appendChild(color_div);
+
+        // Create red slider
+        const red_slider = document.createElement('input') as HTMLInputElement;
+        color_div.appendChild(red_slider);
+        red_slider.type = 'range';
+        red_slider.className = 'marker-red-slide';
+        red_slider.min = '0';
+        red_slider.max = '255';
+        red_slider.value = '0';
+        red_slider.addEventListener('input', (event: Event) => {
+            const target = event.target as HTMLInputElement;
+            this.color.r = Number(target.value);
+        });
+
+        // Create green slider
+        const green_slider = document.createElement('input') as HTMLInputElement;
+        color_div.appendChild(green_slider);
+        green_slider.type = 'range';
+        green_slider.className = 'marker-green-slide';
+        green_slider.min = '0';
+        green_slider.max = '255';
+        green_slider.value = '0';
+        green_slider.addEventListener('input', (event: Event) => {
+            const target = event.target as HTMLInputElement;
+            this.color.g = Number(target.value);
+        });
+
+        // Create blue slider
+        const blue_slider = document.createElement('input') as HTMLInputElement;
+        color_div.appendChild(blue_slider);
+        blue_slider.type = 'range';
+        blue_slider.className = 'marker-blue-slide';
+        blue_slider.min = '0';
+        blue_slider.max = '255';
+        blue_slider.value = '0';
+        blue_slider.addEventListener('input', (event: Event) => {
+            const target = event.target as HTMLInputElement;
+            this.color.b = Number(target.value);
+        });
+
+
     }
 }
 
@@ -435,54 +496,62 @@ tools.select(MARKER_TOOL_NAME);
 
 
 // Sticker tool
-function _draw_at(context: CanvasRenderingContext2D, point: PointOnCanvas,
-        content: string) {
+function _draw_at(
+        context: CanvasRenderingContext2D, point: PointOnCanvas,
+        content: string, rotate: number) {
+
     // set font size for rendering
     context.font = '24px serif';
 
-    // rendering position
-    const x = point.x - 15;
-    const y = point.y + 15;
+    // save canvas state
+    context.save();
+
+    // translate context to the position where text is drawn
+    context.translate(point.x, point.y);
+
+    // rotate context by specified angle (in radians)
+    context.rotate(rotate);
 
     // draw the emoji on the context at specified coordinates
-    context.fillText(content, x, y);
+    // since we have already translated, use 0, 0 to place it correctly
+    context.fillText(content, -15, 15);
+
+    // restore the canvas to its original state
+    context.restore();
 }
 
 class StickerStamp implements UndoableDraw {
     sticker: string;
-    position: PointOnCanvas
+    position: PointOnCanvas;
+    rotate: number;
 
-    constructor(sticker: string, position: PointOnCanvas) {
+    constructor(sticker: string, position: PointOnCanvas, rotate: number) {
         this.sticker = sticker
         this.position = position;
+        this.rotate = rotate;
     }
 
     do(context: CanvasRenderingContext2D): void {
-        _draw_at(context, this.position, this.sticker);
+        _draw_at(context, this.position, this.sticker, this.rotate);
     }
 }
 
 class StickerTool extends Tool {
-    content: string = STICKER_1;
+    content: string = STICKERS[0];
+    rotate: number = 0;
 
     protected init_div(): void {
-        const button1 = document.createElement('button');
-        button1.textContent = STICKER_1;
-        button1.addEventListener('click', () => {
-            this.content = STICKER_1;
-        });
-
-        const button2 = document.createElement('button');
-        button2.textContent = STICKER_2;
-        button2.addEventListener('click', () => {
-            this.content = STICKER_2;
-        });
-
-        const button3 = document.createElement('button');
-        button3.textContent = STICKER_3;
-        button3.addEventListener('click', () => {
-            this.content = STICKER_3;
-        });
+        // row given stickers
+        const row_given = document.createElement('div') as HTMLDivElement;
+        this.div_element.appendChild(row_given);
+        for (const content of STICKERS) {
+            const button = document.createElement('button');
+            button.textContent = content;
+            button.addEventListener('click', () => {
+                this.content = content;
+            });
+            row_given.appendChild(button);
+        }
 
         const custom_button = document.createElement('button');
         custom_button.textContent ='custom';
@@ -491,15 +560,25 @@ class StickerTool extends Tool {
             this.content = opt!;
         });
 
-        // Append buttons to div_element
-        this.div_element.appendChild(button1);
-        this.div_element.appendChild(button2);
-        this.div_element.appendChild(button3);
         this.div_element.appendChild(custom_button);
+
+        const rotate_text = document.createTextNode('rotate:');
+        this.div_element.appendChild(rotate_text);
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.value = '50';
+        slider.addEventListener('input', (event: Event) => {
+            const target = event.target as HTMLInputElement;
+            const value = Number(target.value);
+
+            this.rotate = (value - 50) / 50 * Math.PI;
+        });
+        this.div_element.appendChild(slider);
     }
 
     preview_draw(context: CanvasRenderingContext2D): void {
-        _draw_at(context, mouse_current!, this.content);
+        _draw_at(context, mouse_current!, this.content, this.rotate);
     }
 }
 
@@ -579,14 +658,15 @@ canvas.addEventListener("mousedown", (event) => {
     case MARKER_TOOL_NAME:
         if (marker_tool.current_stroke === null) {
             marker_tool.current_stroke =
-                    new MarkerStroke(marker_tool.thickness);
+                    new MarkerStroke(marker_tool.thickness,
+                    {...marker_tool.color});
             marker_tool.current_stroke.push({x: event.offsetX, y: event.offsetY});
         }
         break;
 
     case STICKER_TOOL_NAME:
         render_system.add(new StickerStamp(sticker_tool.content,
-                mouse_current!));
+                mouse_current!, sticker_tool.rotate));
         break;
     }
 

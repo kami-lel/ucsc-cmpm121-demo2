@@ -136,3 +136,26 @@ canvas {
   border-radius: 10px; /* This gives the border rounded corners */
   padding: 15px;
 }
+
+input[type="range"].marker-red-slide::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, black, red);
+}
+
+input[type="range"].marker-green-slide::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, black, green);
+}
+
+input[type="range"].marker-blue-slide::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, black, blue);
+}
+.marker-red-slide {
+    background: linear-gradient(to right, black, red);
+}
+
+.marker-green-slide {
+    background: linear-gradient(to right, black, green);
+}
+
+.marker-blue-slide {
+    background: linear-gradient(to right, black, blue);
+}
